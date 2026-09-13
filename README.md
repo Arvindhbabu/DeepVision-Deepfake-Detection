@@ -331,6 +331,6 @@ This project is released under the [MIT License](LICENSE).
 
 ## 19. Author
 
-**Arvindh Babu V** — Lead ML Architect & Developer  
+**Arvindh Babu V** — AI & Data Science Student  
 *GitHub*: [Arvindhbabu](https://github.com/Arvindhbabu)  
-*Portfolio*: [DeepVision AI](https://github.com/Arvindhbabu/DeepVision-Deepfake-Detection)
+*Repository*: [DeepVision AI](https://github.com/Arvindhbabu/DeepVision-AI)

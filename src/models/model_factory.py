@@ -42,6 +42,7 @@ class ModelFactory:
                 num_classes=config["model"].get("num_classes", 2),
                 hidden_dim=config["model"].get("hidden_dim", 256),
                 dropout=config["model"].get("dropout", 0.3),
+                pretrained=config["model"].get("pretrained", True),
                 freeze_backbone=config["model"].get("freeze_backbone", True),
             )
 

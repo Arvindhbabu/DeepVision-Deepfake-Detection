@@ -23,11 +23,13 @@ class EfficientNetBiLSTM(BaseModel):
         hidden_dim: int = 256,
         num_layers: int = 1,
         dropout: float = 0.3,
+        pretrained: bool = True,
         freeze_backbone: bool = True,
     ):
         super().__init__()
 
-        backbone = models.efficientnet_b2(weights=models.EfficientNet_B2_Weights.DEFAULT)
+        weights = models.EfficientNet_B2_Weights.DEFAULT if pretrained else None
+        backbone = models.efficientnet_b2(weights=weights)
         self.cnn = backbone.features
 
         if freeze_backbone:

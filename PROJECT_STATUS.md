@@ -1,57 +1,46 @@
-# DeepVision AI — Project Status
+# DeepVision AI — Implementation Status & Roadmap
 
-## Sprint 1 – Foundation ✅
-- [x] Repository Recovery & Code Refactoring
-- [x] Clean Portable Development Environment (`environment.yml`, `requirements.txt`)
-- [x] Hierarchical YAML Configuration System (`configs/default.yaml`, `configs/smoke_test.yaml`)
+> Accurate status summary of implemented, tested, experimental, and planned system components.
 
 ---
 
-## Sprint 2 – Data Pipeline ✅
-- [x] Dataset Metadata Indexer (`src/datasets/tf_dataset_builder.py`)
-- [x] Stratified Dataset Split Generator (`src/datasets/split_generator.py`)
-- [x] Sequence Dataset Loader with `.npy` Support (`src/datasets/sequence_dataset.py`)
+## 1. Implemented Components
+
+- **Dataset Indexer & Metadata Generator**: `src/datasets/tf_dataset_builder.py`
+- **Stratified Split Generator**: `src/datasets/split_generator.py`
+- **Sequence Dataset Loader (.npy)**: `src/datasets/sequence_dataset.py`
+- **Balanced Class Sampler**: `src/datasets/balanced_sampler.py`
+- **PyTorch DataLoader Factory**: `src/datasets/dataloader.py`
+- **ViT-B/16 + Temporal Pooling Model**: `src/models/vit_temporal_pooling.py`
+- **EfficientNet-B2 + BiLSTM Model**: `src/models/efficientnet_bilstm.py`
+- **Model Factory System**: `src/models/model_factory.py`
+- **Config-Driven Training Engine**: `train.py`, `src/training/trainer.py`
+- **Checkpoint & Experiment Tracking**: `src/training/checkpoint.py`
+- **Metric Computer & Evaluator**: `evaluate.py`, `src/training/metrics.py`
+- **Grad-CAM Visual Heatmap Engine**: `src/explainability/gradcam.py`
+- **Multi-Clip Video Inference Engine**: `predict.py`, `src/inference/predictor.py`
 
 ---
 
-## Sprint 3 – Training Infrastructure ✅
-- [x] Balanced Sampler for Class Imbalance (`src/datasets/balanced_sampler.py`)
-- [x] PyTorch DataLoader Factory (`src/datasets/dataloader.py`)
-- [x] Modular Training Engine (`src/training/trainer.py`)
-- [x] Checkpoint & Artifact Manager (`src/training/checkpoint.py`)
-- [x] Structured Logging System (`src/utils/logger.py`)
+## 2. Tested Components
+
+- **Unit Test Suite**: 23 test modules in `tests/` covering config loading, dataset construction, sequence shapes, model factory, forward passes, metric calculations, checkpointing, trainer loops, inference, and explainability.
+- **CPU Training Smoke Test**: 1-epoch execution on CPU via `python train.py --config configs/smoke_test.yaml --synthetic-fallback`.
+- **CPU Evaluation Smoke Test**: Complete test set evaluation & metric reporting via `evaluate.py`.
+- **Inference Pipeline Smoke Test**: Multi-clip sequence tensor inference via `predict.py`.
+- **Automated CI**: GitHub Actions workflow in `.github/workflows/ci.yml`.
 
 ---
 
-## Sprint 4 – Model Architectures ✅
-- [x] ViT-B/16 + Temporal Mean Pooling Core Model (`src/models/vit_temporal_pooling.py`)
-- [x] EfficientNet-B2 + BiLSTM Hybrid Model (`src/models/efficientnet_bilstm.py`)
-- [x] Factory Interface for Model Instantiation (`src/models/model_factory.py`)
+## 3. Experimental Components
+
+- **Multi-Dataset Cross Evaluation**: Benchmarking models trained on FF++ against unseen Celeb-DF v2 splits.
+- **Layer-Specific Grad-CAM Target Tuning**: Comparing activation heatmaps across different Vision Transformer projection blocks.
 
 ---
 
-## Sprint 5 – Evaluation Pipeline ✅
-- [x] Evaluation Metric Engine (`evaluate.py`)
-- [x] ROC Curve & AUC Generator
-- [x] Confusion Matrix Display Export
-- [x] Predictions CSV Export & Metric JSON Output
+## 4. Planned Roadmap
 
----
-
-## Sprint 6 – Explainability & Inference ✅
-- [x] Grad-CAM Visual Heatmap Extractor (`src/explainability/gradcam.py`)
-- [x] Multi-Clip Video Inference Engine (`src/inference/predictor.py`)
-- [x] Inference CLI (`predict.py`)
-
----
-
-## Sprint 7 – Verification & Test Suite ✅
-- [x] Comprehensive `unittest` Suite in `tests/`
-- [x] End-to-End CPU Training Smoke Test
-- [x] GitHub Actions CI Pipeline (`.github/workflows/ci.yml`)
-
----
-
-## Sprint 8 – Documentation ✅
-- [x] Technical Architecture Documentation (`docs/ARCHITECTURE.md`)
-- [x] Professional Portfolio README (`README.md`)
+- [ ] Streamlit interactive web deployment interface.
+- [ ] 3D CNN spatio-temporal backbones (ResNet3D, SlowFast).
+- [ ] Model quantization & ONNX runtime export for real-time mobile/edge inference.

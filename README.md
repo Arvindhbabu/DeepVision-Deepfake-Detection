@@ -2,18 +2,16 @@
 
 > An Explainable Deepfake Detection Framework leveraging Vision Transformers, Temporal Pooling, and Grad-CAM Interpretability.
 
+[![DeepVision AI CI](https://github.com/Arvindhbabu/DeepVision-Deepfake-Detection/actions/workflows/ci.yml/badge.svg)](https://github.com/Arvindhbabu/DeepVision-Deepfake-Detection/actions)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.2.2-ee4c2c.svg)](https://pytorch.org/)
-[![Computer Vision](https://img.shields.io/badge/Domain-Computer%20Vision-blueviolet.svg)](#)
-[![Deep Learning](https://img.shields.io/badge/Category-Deep%20Learning-green.svg)](#)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Build Status](https://img.shields.io/badge/CI-Passing-brightgreen.svg)](#)
 
 ---
 
 ## 1. Overview
 
-**DeepVision AI** is a modular deep learning repository engineered for detecting AI-manipulated facial videos (deepfakes). The framework extracts facial frame sequences from input videos, feeds them through a Vision Transformer (ViT-B/16) spatial feature extractor, aggregates frame embeddings using temporal mean pooling, and predicts whether the content is authentic (**REAL**) or manipulated (**DEEPFAKE**). Visual explainability is integrated via Grad-CAM to highlight facial regions influencing classification decisions.
+**DeepVision AI** is a modular deep learning framework engineered for detecting AI-manipulated facial videos (deepfakes). The framework extracts facial frame sequences from input videos, feeds them through a Vision Transformer (ViT-B/16) spatial feature extractor, aggregates frame embeddings using temporal mean pooling, and predicts whether the content is authentic (**REAL**) or manipulated (**DEEPFAKE**). Visual explainability is integrated via Grad-CAM to highlight facial regions influencing classification decisions.
 
 ---
 
@@ -97,227 +95,56 @@ Metrics & ROC-AUC Reports                           Grad-CAM Heatmaps
 
 ---
 
-## 5. Model Architecture
+## 5. Supported Models
 
 ### Canonical Model: `ViTTemporalPooling`
 
 - **Input Tensor**: `(B, T, C, H, W)` where $B$ is batch size, $T$ is sequence length (default 26 frames), $C=3$, $H=224$, $W=224$.
 - **Spatial Feature Extractor**: Reshapes tensor to `(B * T, C, H, W)` and passes through ViT-B/16 backbone yielding 768-dimensional per-frame embeddings.
 - **Temporal Pooling**: Restores sequence tensor `(B, T, 768)` and applies temporal mean pooling across dimension $T \rightarrow (B, 768)$.
-- **Classification Head**:
-  - `Linear(768, 256)`
-  - `ReLU()`
-  - `Dropout(0.3)`
-  - `Linear(256, 2)`
+- **Classification Head**: `Linear(768, 256) -> ReLU() -> Dropout(0.3) -> Linear(256, 2)`
 
-```python
-import torch
-from src.models.vit_temporal_pooling import ViTTemporalPooling
+### Alternate Model: `EfficientNetBiLSTM`
 
-model = ViTTemporalPooling(image_size=224, num_classes=2, pooling="mean")
-x = torch.randn(2, 26, 3, 224, 224)  # (Batch=2, Time=26, Channels=3, Height=224, Width=224)
-logits = model(x)                     # Output: (2, 2)
-```
+- **Spatial Extractor**: EfficientNet-B2 backbone returning 1408-dimensional feature vectors per frame.
+- **Temporal Sequence Model**: Bidirectional LSTM (`hidden_dim=256`) processing full frame sequences.
 
 ---
 
-## 6. Dataset
+## 6. Dataset & Pipeline
 
-DeepVision AI supports public benchmark datasets:
-- **FaceForensics++ (FF++)**: Standard benchmark containing original raw videos and manipulated subsets (Deepfakes, FaceSwap, Face2Face, NeuralTextures).
-- **Celeb-DF v2**: High-quality deepfake benchmark dataset with diverse lighting and identity swaps.
-
----
-
-## 7. Data Processing Pipeline
-
-1. **Frame Extraction**: Sample video frames at target FPS (default 5 FPS) using OpenCV (`src/preprocessing/extract_frames.py`).
-2. **Face Detection & Alignment**: Detect and crop face bounding boxes using MTCNN (`src/preprocessing/face_align_mtcnn.py`).
-3. **Sequence Construction**: Uniformly sample $T$ frames across video duration and save as compressed `.npy` arrays (`src/preprocessing/make_sequences.py`).
-4. **Metadata Indexing & Stratified Splitting**: Generate `dataset_index.csv` and generate balanced 70/15/15 train/val/test splits (`src/datasets/split_generator.py`).
+1. **Frame Extraction**: Sample video frames at target FPS using OpenCV (`src/preprocessing/extract_frames.py`).
+2. **Face Alignment**: Detect and crop face bounding boxes using MTCNN (`src/preprocessing/face_align_mtcnn.py`).
+3. **Sequence Construction**: Uniformly sample $T$ frames across video duration and save as `.npy` arrays (`src/preprocessing/make_sequences.py`).
+4. **Metadata Indexing & Stratified Splitting**: Generate `dataset_index.csv` and generate non-overlapping train/val/test splits without video identity leakage (`src/datasets/split_generator.py`).
 
 ---
 
-## 8. Training
-
-Execute model training using the authoritative configuration file:
-
-```bash
-python train.py --config configs/default.yaml
-```
-
-For lightweight CPU smoke testing or CI pipeline validation:
-
-```bash
-python train.py --config configs/smoke_test.yaml --synthetic-fallback
-```
-
-Key features of the training pipeline:
-- **Deterministic Seed**: Sets random seeds across `random`, `numpy`, and `torch`.
-- **Weighted Class Sampling**: Handles class imbalance between real and synthetic videos.
-- **Checkpointing**: Tracks best validation loss and automatically saves `best_model.pth` and `last_model.pth` along with experiment `config.yaml` and `metrics.json`.
-
----
-
-## 9. Evaluation
-
-Run comprehensive test set evaluation against a trained model checkpoint:
-
-```bash
-python evaluate.py --config configs/default.yaml --checkpoint outputs/runs/run_20260913_120000/best_model.pth --output outputs/evaluation
-```
-
-Generated metrics and visual outputs:
-- `metrics.json`: Numerical summary (Accuracy, Precision, Recall, F1 Score, ROC-AUC).
-- `confusion_matrix.csv` & `confusion_matrix.png`: Confusion matrix table and display plot.
-- `roc_curve.png`: Receiver Operating Characteristic curve.
-- `predictions.csv`: Per-video ground-truth vs predicted labels and fake probability scores.
-
----
-
-## 10. Inference
-
-Run single-video multi-clip deepfake inference using the CLI tool:
-
-```bash
-python predict.py --video path/to/video.mp4 --checkpoint outputs/runs/run_20260913_120000/best_model.pth --clips 5
-```
-
-Example Output:
-```text
-============================================================
-DeepVision AI — Inference Tool
-============================================================
-Video File  : sample_video.mp4
-Checkpoint  : outputs/runs/run_20260913_120000/best_model.pth
-Model       : vit_temporal_pooling
-Clips       : 5
-============================================================
-
-Clip-wise Deepfake Probabilities:
-  Clip 01: 94.20%
-  Clip 02: 96.10%
-  Clip 03: 93.80%
-  Clip 04: 95.50%
-  Clip 05: 94.90%
-
-============================================================
-FINAL PREDICTION : DEEPFAKE
-CONFIDENCE       : 94.90%
-============================================================
-```
-
----
-
-## 11. Explainability
-
-DeepVision AI integrates **Grad-CAM** (Gradient-weighted Class Activation Mapping) to compute spatial activation maps indicating facial region focus during prediction.
-
-```python
-import cv2
-import torch
-from src.explainability.gradcam import GradCAM
-from src.models.vit_temporal_pooling import ViTTemporalPooling
-
-model = ViTTemporalPooling(pretrained=True)
-gradcam = GradCAM(model=model, target_layer=model.backbone.conv_proj)
-
-input_tensor = torch.randn(1, 26, 3, 224, 224, requires_grad=True)
-heatmap = gradcam.generate_heatmap(input_tensor, target_class=1)
-
-# Overlay heatmap on original facial image
-frame_rgb = cv2.imread("face.jpg")[:, :, ::-1]
-visualization = GradCAM.overlay_heatmap(frame_rgb, heatmap)
-```
-
----
-
-## 12. Project Structure
-
-```text
-deepfake-detection/
-├── .github/workflows/ci.yml     # Automated GitHub Actions CI workflow
-├── configs/
-│   ├── default.yaml            # Default training & model configuration
-│   └── smoke_test.yaml         # Lightweight test configuration
-├── docs/
-│   └── ARCHITECTURE.md         # Detailed technical design document
-├── src/
-│   ├── datasets/               # Sequence dataset loaders & split generators
-│   ├── explainability/         # Grad-CAM heatmap generator
-│   ├── inference/              # Multi-clip predictor engine
-│   ├── models/                 # ViT and EfficientNet model architectures
-│   ├── preprocessing/          # Frame extraction & face alignment
-│   ├── training/               # Trainer loop, callbacks & metrics
-│   └── utils/                  # Config parser & logging system
-├── tests/                      # PyTorch unittest test suite
-├── train.py                    # Training entry point
-├── evaluate.py                 # Evaluation entry point
-├── predict.py                  # Single-video inference CLI
-├── environment.yml             # Conda environment definition
-├── requirements.txt            # Python dependencies
-├── PROJECT_STATUS.md           # Roadmap and sprint progress tracker
-└── README.md                   # Project documentation
-```
-
----
-
-## 13. Installation
+## 7. Installation
 
 ### Prerequisites
 - Python 3.10+
-- PyTorch 2.2.2+ with CUDA support (or CPU mode)
+- PyTorch 2.2.2+ (CPU or CUDA 12.1)
 
-### Environment Setup
-
-#### Option A: Conda Environment (Recommended)
 ```bash
+git clone https://github.com/Arvindhbabu/DeepVision-Deepfake-Detection.git
+cd DeepVision-Deepfake-Detection
+
+# Option A: Conda
 conda env create -f environment.yml
 conda activate deepvision-ai
-```
 
-#### Option B: Virtual Environment via Pip
-```bash
+# Option B: Pip Virtual Environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
 ---
 
-## 14. Usage
+## 8. Configuration
 
-1. **Verify Environment**:
-   ```bash
-   python -m unittest discover tests
-   ```
-
-2. **Index Dataset & Generate Splits**:
-   ```bash
-   python -m src.datasets.tf_dataset_builder
-   python -m src.datasets.split_generator
-   ```
-
-3. **Train Model**:
-   ```bash
-   python train.py --config configs/default.yaml
-   ```
-
-4. **Evaluate Model**:
-   ```bash
-   python evaluate.py --config configs/default.yaml --checkpoint outputs/runs/run_latest/best_model.pth
-   ```
-
-5. **Run Single Video Inference**:
-   ```bash
-   python predict.py --video sample.mp4 --checkpoint outputs/runs/run_latest/best_model.pth
-   ```
-
----
-
-## 15. Configuration
-
-All operational hyperparameters are specified in `configs/default.yaml`:
+All operational parameters are specified in `configs/default.yaml`:
 
 ```yaml
 project:
@@ -361,7 +188,117 @@ model:
 
 ---
 
-## 16. Results
+## 9. Training
+
+Execute model training using the authoritative configuration file:
+
+```bash
+python train.py --config configs/default.yaml
+```
+
+For lightweight CPU smoke testing or CI pipeline validation:
+
+```bash
+python train.py --config configs/smoke_test.yaml --synthetic-fallback
+```
+
+---
+
+## 10. Evaluation
+
+Run comprehensive test set evaluation against a trained model checkpoint:
+
+```bash
+python evaluate.py --config configs/default.yaml --checkpoint outputs/runs/run_latest/best_model.pth --output outputs/evaluation
+```
+
+Outputs generated in `outputs/evaluation/`:
+- `metrics.json`: Accuracy, Precision, Recall, F1 Score, ROC-AUC.
+- `confusion_matrix.png` & `roc_curve.png`: Visual evaluation plots.
+- `predictions.csv`: Per-video true vs predicted labels and fake probability scores.
+
+---
+
+## 11. Inference
+
+Run single-video multi-clip deepfake inference using the CLI tool:
+
+```bash
+python predict.py --input sample_video.mp4 --checkpoint outputs/runs/run_latest/best_model.pth --clips 5
+```
+
+---
+
+## 12. Explainability
+
+Generate Grad-CAM heatmaps to visualize spatial regions influencing model classification:
+
+```python
+import cv2
+import torch
+from src.explainability.gradcam import GradCAM
+from src.models.vit_temporal_pooling import ViTTemporalPooling
+
+model = ViTTemporalPooling(pretrained=True)
+gradcam = GradCAM(model=model, target_layer=model.backbone.conv_proj)
+
+input_tensor = torch.randn(1, 26, 3, 224, 224, requires_grad=True)
+heatmap = gradcam.generate_heatmap(input_tensor, target_class=1)
+
+frame_rgb = cv2.imread("face.jpg")[:, :, ::-1]
+visualization = GradCAM.overlay_heatmap(frame_rgb, heatmap)
+```
+
+---
+
+## 13. Testing
+
+Run the full unit test suite:
+
+```bash
+python -m unittest discover tests
+```
+
+---
+
+## 14. Project Structure
+
+```text
+DeepVision-Deepfake-Detection/
+├── .github/workflows/ci.yml     # Automated GitHub Actions CI workflow
+├── configs/
+│   ├── default.yaml            # Default training & model configuration
+│   └── smoke_test.yaml         # Lightweight test configuration
+├── docs/                       # Modular technical documentation
+│   ├── ARCHITECTURE.md
+│   ├── DATASET.md
+│   ├── TRAINING.md
+│   ├── EVALUATION.md
+│   ├── INFERENCE.md
+│   ├── EXPLAINABILITY.md
+│   └── REPRODUCIBILITY.md
+├── src/
+│   ├── datasets/               # Sequence dataset loaders & split generators
+│   ├── explainability/         # Grad-CAM heatmap generator
+│   ├── inference/              # Multi-clip predictor engine
+│   ├── models/                 # ViT and EfficientNet model architectures
+│   ├── preprocessing/          # Frame extraction & face alignment
+│   ├── training/               # Trainer loop, callbacks & metrics
+│   └── utils/                  # Config parser & logging system
+├── tests/                      # Standardized PyTorch unit test suite
+├── train.py                    # Training CLI entry point
+├── evaluate.py                 # Evaluation CLI entry point
+├── predict.py                  # Single-video inference CLI
+├── environment.yml             # Conda environment definition
+├── requirements.txt            # Python dependencies
+├── .env.example                # Environment variable configuration template
+├── PROJECT_STATUS.md           # Roadmap and sprint progress tracker
+└── README.md                   # Primary project documentation
+```
+
+---
+
+## 15. Results
 
 > [!NOTE]
 > Benchmark experimental results are currently being established through controlled, reproducible experiments across FaceForensics++ and Celeb-DF v2 splits.
@@ -373,36 +310,27 @@ model:
 
 ---
 
-## 17. Limitations
+## 16. Limitations
 
-- **Hardware Memory Requirements**: Vision Transformers require substantial GPU VRAM for long sequence lengths or large batch sizes.
-- **Dataset Bias**: Models trained primarily on FF++ and Celeb-DF may exhibit accuracy drops on unseen commercial deepfake apps without domain adaptation.
-- **Compressional Artifacts**: High video compression ratios (e.g. social media re-encoding) can obscure fine-grained facial artifacts.
-
----
-
-## 18. Future Improvements
-
-- [ ] Implementation of 3D CNN backbones (e.g. ResNet3D, SlowFast) for dynamic motion feature analysis.
-- [ ] Cross-dataset evaluation scripts for out-of-distribution domain generalization benchmarking.
-- [ ] Model quantization and ONNX runtime export for low-latency edge deployment.
-- [ ] Interactive web interface using Streamlit for real-time video upload and heatmap visualization.
+- **Hardware Memory Requirements**: Vision Transformers require GPU VRAM for sequence lengths $>30$ frames at large batch sizes.
+- **Compressional Artifacts**: Heavy social media re-encoding can obscure visual facial manipulation cues.
 
 ---
 
-## 19. Research Direction
+## 17. Reproducibility
 
-Future research will focus on self-supervised pre-training strategies targeting temporal inconsistency along facial boundaries, lip-sync disfluencies, and synthetic eye-blinking patterns.
+Seed initialization (`set_seed`), configuration locking (YAML), deterministic CUDA backends, and tracked run artifacts ensure reproducible experiments. Detailed specifications are provided in [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md).
 
 ---
 
-## 20. License
+## 18. License
 
 This project is released under the [MIT License](LICENSE).
 
 ---
 
-## 21. Author
+## 19. Author
 
-**Arvindh Babu** — Lead ML Architect & Developer  
-*GitHub*: [Arvindhbabu](https://github.com/Arvindhbabu)
+**Arvindh Babu V** — Lead ML Architect & Developer  
+*GitHub*: [Arvindhbabu](https://github.com/Arvindhbabu)  
+*Portfolio*: [DeepVision AI](https://github.com/Arvindhbabu/DeepVision-Deepfake-Detection)

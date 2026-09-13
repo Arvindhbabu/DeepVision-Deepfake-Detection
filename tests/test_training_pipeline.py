@@ -1,88 +1,40 @@
-"""
-DeepVision AI
-
-End-to-End Training Smoke Test
-"""
-
+import unittest
 import torch
 import torch.nn as nn
-
 from src.utils.config import load_config
-from src.datasets.dataloader import create_dataloaders
-from src.models.model_factory import ModelFactory
+from src.models.vit_temporal_pooling import ViTTemporalPooling
 
 
-def main():
+class TestTrainingPipeline(unittest.TestCase):
 
-    print("=" * 60)
-    print(" DeepVision AI - Integration Test ")
-    print("=" * 60)
+    def test_cpu_forward_backward_pass(self):
+        config = load_config("configs/smoke_test.yaml")
+        model = ViTTemporalPooling(
+            image_size=config["dataset"]["image_size"],
+            num_classes=2,
+            pretrained=False,
+            freeze_backbone=True,
+            hidden_dim=64,
+        )
 
-    config = load_config()
+        model.train()
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.AdamW(model.classifier.parameters(), lr=1e-4)
 
-    print("\nLoading dataloaders...")
+        # Batch shape (B=2, T=3, C=3, H=224, W=224)
+        dummy_input = torch.randn(2, 3, 3, 224, 224)
+        dummy_target = torch.tensor([0, 1])
 
-    train_loader, _, _ = create_dataloaders(config)
+        optimizer.zero_grad()
+        outputs = model(dummy_input)
+        self.assertEqual(outputs.shape, (2, 2))
 
-    batch = next(iter(train_loader))
+        loss = criterion(outputs, dummy_target)
+        loss.backward()
+        optimizer.step()
 
-    sequences = batch["sequence"]
-
-    labels = batch["label"]
-
-    print(f"Input Shape : {sequences.shape}")
-
-    print("\nLoading model...")
-
-    model = ModelFactory.create(config)
-
-    model.train()
-
-    criterion = nn.CrossEntropyLoss()
-
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=config["training"]["learning_rate"],
-    )
-
-    print("\nForward Pass...")
-
-    outputs = model(sequences)
-
-    print(f"Output Shape : {outputs.shape}")
-
-    print("\nComputing Loss...")
-
-    loss = criterion(outputs, labels)
-
-    print(f"Loss : {loss.item():.4f}")
-
-    print("\nBackward Pass...")
-
-    optimizer.zero_grad()
-
-    loss.backward()
-
-    optimizer.step()
-
-    print("\nBackward Pass Successful")
-
-    print("\nChecking Gradients...")
-
-    gradients = 0
-
-    for name, param in model.named_parameters():
-
-        if param.grad is not None:
-
-            gradients += 1
-
-    print(f"Layers with gradients : {gradients}")
-
-    print("\nIntegration Test PASSED")
-
-    print("=" * 60)
+        self.assertGreater(loss.item(), 0.0)
 
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

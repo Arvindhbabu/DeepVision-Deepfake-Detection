@@ -1,57 +1,38 @@
-# Dataset
+# Dataset & Raw Files
+data/raw/
+data/intermediate/
+data/processed/
 datasets/
-data/
 frames/
 videos/
 tfrecords/
+*.npy
+*.mp4
+*.avi
 
-# Outputs
+# Outputs & Artifacts
 outputs/
 results/
 logs/
-
-# Checkpoints
 checkpoints/
 weights/
 *.pth
 *.pt
 *.ckpt
-
-# Python
-__pycache__/
-*.pyc
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Outputs
-outputs/
-
-# Models
-*.pth
-*.pt
-*.ckpt
-
-# Logs
 *.log
 
-# Cache
+# Python & Environment
 __pycache__/
 *.pyc
-
-# VSCode
-.vscode/
-
-# Conda
+*.pyo
+*.pyd
 .env
 .venv
+conda_envs/
+*.zip
 
-# Dataset
-data/raw/
-data/intermediate/
-data/processed/
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

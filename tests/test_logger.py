@@ -1,20 +1,15 @@
+import unittest
+import logging
 from src.utils.logger import create_logger
 
 
-def main():
+class TestLogger(unittest.TestCase):
 
-    logger = create_logger()
-
-    logger.info("DeepVision AI Logger Initialized")
-
-    logger.info("Training Started")
-
-    logger.warning("Sample Warning")
-
-    logger.error("Sample Error")
-
-    print("\nLogger Test Complete")
+    def test_create_logger(self):
+        logger = create_logger()
+        self.assertIsInstance(logger, logging.Logger)
+        logger.info("Test log message")
 
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

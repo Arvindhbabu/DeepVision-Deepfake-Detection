@@ -9,26 +9,38 @@ Author : Arvindh Babu
 """
 
 import argparse
+import random
 from pathlib import Path
 
-# pyrefly: ignore [missing-import]
+import numpy as np
 import torch
-# pyrefly: ignore [missing-import]
 import torch.nn as nn
 
 from src.utils.config import load_config
 from src.utils.logger import create_logger
-
 from src.datasets.dataloader import create_dataloaders
-
 from src.models.model_factory import ModelFactory
-
 from src.training.optimizer_factory import OptimizerFactory
 from src.training.scheduler_factory import SchedulerFactory
-
 from src.training.checkpoint import CheckpointManager
 from src.training.early_stopping import EarlyStopping
 from src.training.trainer import Trainer
+
+
+# ============================================================
+# Seed & Reproducibility
+# ============================================================
+
+def set_seed(seed: int = 42):
+    """Set random seed for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
 
 # ============================================================
@@ -36,12 +48,9 @@ from src.training.trainer import Trainer
 # ============================================================
 
 def parse_arguments():
-    """
-    Parse command-line arguments.
-    """
-
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="DeepVision AI Training"
+        description="DeepVision AI Training Script"
     )
 
     parser.add_argument(
@@ -55,42 +64,41 @@ def parse_arguments():
         "--resume",
         type=str,
         default=None,
-        help="Checkpoint to resume training",
+        help="Path to model checkpoint to resume training from",
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for reproducibility",
+    )
+
+    parser.add_argument(
+        "--synthetic-fallback",
+        action="store_true",
+        help="Allow synthetic dummy sequence generation if sequence files are missing (useful for smoke tests)",
     )
 
     return parser.parse_args()
 
 
 # ============================================================
-# Device
+# Device Selection
 # ============================================================
 
 def get_device():
-
+    """Detect and return available compute device (CUDA / CPU)."""
     if torch.cuda.is_available():
-
         device = torch.device("cuda")
-
         print("=" * 60)
         print("CUDA AVAILABLE")
         print("=" * 60)
-
-        print(
-            "GPU :",
-            torch.cuda.get_device_name(0),
-        )
-
-        print(
-            "CUDA Version :",
-            torch.version.cuda,
-        )
-
+        print("GPU          :", torch.cuda.get_device_name(0))
+        print("CUDA Version :", torch.version.cuda)
         print("=" * 60)
-
     else:
-
         device = torch.device("cpu")
-
         print("=" * 60)
         print("Running on CPU")
         print("=" * 60)
@@ -99,123 +107,79 @@ def get_device():
 
 
 # ============================================================
-# Main
+# Main Entry Point
 # ============================================================
 
 def main():
-
     args = parse_arguments()
+
+    set_seed(args.seed)
 
     config = load_config(args.config)
 
     logger = create_logger()
 
     logger.info("=" * 60)
-    logger.info("DeepVision AI")
+    logger.info("DeepVision AI — Training System")
     logger.info("=" * 60)
 
     device = get_device()
-
     logger.info(f"Device : {device}")
 
     # --------------------------------------------------------
-    # Dataloaders
+    # DataLoaders
     # --------------------------------------------------------
-
-    logger.info("Creating dataloaders...")
+    logger.info("Creating DataLoaders...")
 
     train_loader, val_loader, test_loader = create_dataloaders(
-        config
+        config,
+        synthetic_fallback=args.synthetic_fallback,
     )
 
     logger.info("DataLoaders Ready")
+    logger.info(f"Training batches   : {len(train_loader)}")
+    logger.info(f"Validation batches : {len(val_loader)}")
+    logger.info(f"Test batches       : {len(test_loader)}")
 
-    logger.info(
-        f"Training batches : {len(train_loader)}"
-    )
-
-    logger.info(
-        f"Validation batches : {len(val_loader)}"
-    )
-
-    logger.info(
-        f"Test batches : {len(test_loader)}"
-    )
-
-    # --------------------------------------------------------
-    # Model
-    # --------------------------------------------------------
-
-    logger.info("Creating model...")
-
-    model = ModelFactory.create(config)
-
-    model = model.to(device)
-
-    logger.info(f"Model : {model.__class__.__name__}")
-
-    total_params = sum(
-        p.numel() for p in model.parameters()
-    )
-
-    trainable_params = sum(
-        p.numel()
-        for p in model.parameters()
-        if p.requires_grad
-    )
-
-    logger.info(
-        f"Total Parameters      : {total_params:,}"
-    )
-
-    logger.info(
-        f"Trainable Parameters  : {trainable_params:,}"
-    )
-
-    # --------------------------------------------------------
-    # Loss
-    # --------------------------------------------------------
-
-    criterion = nn.CrossEntropyLoss()
-
-    logger.info("Loss : CrossEntropyLoss")
-
-    # --------------------------------------------------------
-    # Optimizer
-    # --------------------------------------------------------
-
-    optimizer = OptimizerFactory.create(
-        model,
-        config,
-    )
-
-    logger.info(
-        f"Optimizer : {optimizer.__class__.__name__}"
-    )
-
-    # --------------------------------------------------------
-    # Scheduler
-    # --------------------------------------------------------
-
-    scheduler = SchedulerFactory.create(
-        optimizer,
-        config,
-    )
-
-    if scheduler is not None:
-
-        logger.info(
-            f"Scheduler : {scheduler.__class__.__name__}"
+    if len(train_loader) == 0:
+        logger.warning(
+            "Training loader is EMPTY. Please run data indexer/split generator or use --synthetic-fallback."
         )
 
-    else:
+    # --------------------------------------------------------
+    # Model Creation
+    # --------------------------------------------------------
+    logger.info("Creating Model via ModelFactory...")
 
-        logger.info("Scheduler : None")
+    model = ModelFactory.create(config)
+    model = model.to(device)
+
+    logger.info(f"Model Architecture : {model.__class__.__name__}")
+
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    logger.info(f"Total Parameters     : {total_params:,}")
+    logger.info(f"Trainable Parameters : {trainable_params:,}")
+
+    # --------------------------------------------------------
+    # Criterion, Optimizer, Scheduler
+    # --------------------------------------------------------
+    criterion = nn.CrossEntropyLoss()
+    logger.info("Loss Criterion : CrossEntropyLoss")
+
+    optimizer = OptimizerFactory.create(model, config)
+    logger.info(f"Optimizer      : {optimizer.__class__.__name__}")
+
+    scheduler = SchedulerFactory.create(optimizer, config)
+    if scheduler is not None:
+        logger.info(f"Scheduler      : {scheduler.__class__.__name__}")
+    else:
+        logger.info("Scheduler      : None")
 
     # --------------------------------------------------------
     # Checkpoint Manager
     # --------------------------------------------------------
-
     config["runtime"] = {
         "device": str(device),
         "total_parameters": total_params,
@@ -223,219 +187,106 @@ def main():
     }
 
     checkpoint_manager = CheckpointManager()
-
     checkpoint_manager.save_config(config)
 
-    logger.info(
-        f"Experiment Folder : {checkpoint_manager.path}"
-    )
+    logger.info(f"Experiment Folder  : {checkpoint_manager.path}")
 
     # --------------------------------------------------------
     # Early Stopping
     # --------------------------------------------------------
-
-    early_stopping = EarlyStopping(
-        patience=5
-    )
+    patience = config["training"].get("early_stopping_patience", 5)
+    early_stopping = EarlyStopping(patience=patience)
 
     # --------------------------------------------------------
-    # Resume Training
+    # Resume Checkpoint
     # --------------------------------------------------------
+    resume_epoch = 0
+    resume_best_loss = float("inf")
 
     if args.resume is not None:
-
-        logger.info(
-            f"Loading checkpoint : {args.resume}"
-        )
-
-        epoch, best_loss = checkpoint_manager.load_checkpoint(
+        logger.info(f"Loading checkpoint from: {args.resume}")
+        resume_epoch, resume_best_loss = checkpoint_manager.load_checkpoint(
             checkpoint_path=args.resume,
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
             map_location=device,
         )
-
-        trainer_state = None  # placeholder until trainer is created
-
-        
-
-        logger.info(
-            f"Checkpoint Loaded (Epoch {epoch})"
-        )
+        logger.info(f"Resuming from Epoch {resume_epoch} (Best Val Loss: {resume_best_loss:.4f})")
 
     # --------------------------------------------------------
     # Trainer
     # --------------------------------------------------------
-
     trainer = Trainer(
-
         model=model,
-
         optimizer=optimizer,
-
         criterion=criterion,
-
         train_loader=train_loader,
-
         val_loader=val_loader,
-
         device=device,
-
         logger=logger,
-
         checkpoint_manager=checkpoint_manager,
-
         early_stopping=early_stopping,
-
         scheduler=scheduler,
     )
 
     if args.resume is not None:
-        trainer.state.epoch = epoch
-        trainer.state.best_val_loss = best_loss
+        trainer.state.epoch = resume_epoch
+        trainer.state.best_val_loss = resume_best_loss
 
     # --------------------------------------------------------
-    # Start Training
+    # Run Training Loop
     # --------------------------------------------------------
+    epochs = config["training"].get("epochs", 50)
 
     logger.info("=" * 60)
-    logger.info("DeepVision AI")
-    logger.info("=" * 60)
-    logger.info(f"Model      : {model.__class__.__name__}")
-    logger.info(f"Device     : {device}")
-    logger.info(f"Epochs     : {config['training']['epochs']}")
-    logger.info(f"Batch Size : {config['dataloader']['batch_size']}")
-    logger.info(
-        f"Learning Rate : {config['training']['learning_rate']}"
-    )
-    logger.info(
-        f"Dataset : {config['dataset']['name']}"
-    )
+    logger.info(f"Model         : {model.__class__.__name__}")
+    logger.info(f"Device        : {device}")
+    logger.info(f"Epochs        : {epochs}")
+    logger.info(f"Batch Size    : {config['dataloader'].get('batch_size', 2)}")
+    logger.info(f"Learning Rate : {config['training'].get('learning_rate', 1e-4)}")
+    logger.info(f"Dataset       : {config['dataset'].get('name', 'FFPP_CelebDF')}")
     logger.info("=" * 60)
 
     history = []
 
     try:
-
-        history = trainer.train(
-            epochs=config["training"]["epochs"]
-        )
-
+        if len(train_loader) > 0:
+            history = trainer.train(epochs=epochs)
+        else:
+            logger.warning("Skipping training execution due to empty DataLoader.")
     except KeyboardInterrupt:
-
-        logger.warning(
-            "Training interrupted by user."
-        )
-
-    except Exception:
-
-        logger.exception(
-            "Training failed."
-        )
-
-        raise
-
+        logger.warning("Training interrupted by user.")
+    except Exception as e:
+        logger.exception("Training encountered an error.")
+        raise e
     finally:
         try:
-            checkpoint_manager.copy_log(
-                "outputs/logs/train.log"
-            )
-        except Exception as e:
-            logger.warning(
-                f"Unable to copy log: {e}"
-            )
+            checkpoint_manager.copy_log("outputs/logs/train.log")
+        except Exception:
+            pass
 
     # --------------------------------------------------------
-    # Save Training Log
+    # Summary
     # --------------------------------------------------------
-    
-    try:
-
-        checkpoint_manager.copy_log(
-            "outputs/logs/train.log"
-        )
-
-    except Exception as e:
-
-        logger.warning(
-            f"Unable to copy log file: {e}"
-        )
-
-    # --------------------------------------------------------
-    # Training Summary
-    # --------------------------------------------------------
-
     logger.info("=" * 60)
-    logger.info("Training Completed Successfully")
+    logger.info("Training Process Finished")
     logger.info("=" * 60)
-
-    logger.info(
-        f"Experiment Directory : {checkpoint_manager.path}"
-    )
-
-    logger.info(
-        f"Epochs Completed : {len(history)}"
-    )
+    logger.info(f"Experiment Output : {checkpoint_manager.path}")
+    logger.info(f"Epochs Completed  : {len(history)}")
 
     if len(history) > 0:
+        best_epoch = min(history, key=lambda x: x.get("val_loss", float("inf")))
+        logger.info(f"Best Val Loss     : {best_epoch.get('val_loss', 0.0):.4f}")
+        logger.info(f"Best Val Accuracy : {best_epoch.get('val_acc', 0.0):.2f}%")
 
-        best_epoch = min(
-            history,
-            key=lambda x: x["val_loss"]
-        )
-
-        logger.info(
-            f"Best Validation Loss : {best_epoch['val_loss']:.4f}"
-        )
-
-        logger.info(
-            f"Best Validation Accuracy : {best_epoch['val_acc']:.2f}%"
-        )
-
-    logger.info(
-        "Artifacts Saved:"
-    )
-
-    logger.info(
-        f"  • Best Model      : {checkpoint_manager.path / 'best_model.pth'}"
-    )
-
-    logger.info(
-        f"  • Last Model      : {checkpoint_manager.path / 'last_model.pth'}"
-    )
-
-    logger.info(
-        f"  • Metrics         : {checkpoint_manager.path / 'metrics.json'}"
-    )
-
-    logger.info(
-        f"  • Config          : {checkpoint_manager.path / 'config.yaml'}"
-    )
-
-    logger.info(
-        f"  • Training Log    : {checkpoint_manager.path / 'train.log'}"
-    )
-
-    logger.info(
-        f"Training Samples : {len(train_loader.dataset)}"
-    )
-
-    logger.info(
-        f"Validation Samples : {len(val_loader.dataset)}"
-    )
-
-    logger.info(
-        f"Test Samples : {len(test_loader.dataset)}"
-    )
-
+    logger.info("Artifacts Location:")
+    logger.info(f"  • Best Model   : {checkpoint_manager.path / 'best_model.pth'}")
+    logger.info(f"  • Last Model   : {checkpoint_manager.path / 'last_model.pth'}")
+    logger.info(f"  • Metrics      : {checkpoint_manager.path / 'metrics.json'}")
+    logger.info(f"  • Config       : {checkpoint_manager.path / 'config.yaml'}")
     logger.info("=" * 60)
 
 
-# ============================================================
-# Entry Point
-# ============================================================
-
 if __name__ == "__main__":
-
     main()

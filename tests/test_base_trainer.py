@@ -1,26 +1,23 @@
+import unittest
 from src.training.base_trainer import BaseTrainer
 
 
 class DummyTrainer(BaseTrainer):
-
     def train_one_epoch(self):
-        pass
+        return 0.5, 80.0
 
     def validate(self):
-        pass
+        return 0.4, 85.0
 
     def train(self, epochs):
-        pass
+        return []
 
 
-def main():
+class TestBaseTrainer(unittest.TestCase):
 
-    print("BaseTrainer imported successfully")
-
-    print(BaseTrainer)
-
-    print(DummyTrainer)
+    def test_base_trainer_subclass(self):
+        self.assertTrue(issubclass(DummyTrainer, BaseTrainer))
 
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

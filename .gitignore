@@ -2,7 +2,7 @@
 data/raw/
 data/intermediate/
 data/processed/
-datasets/
+/datasets/
 frames/
 videos/
 tfrecords/

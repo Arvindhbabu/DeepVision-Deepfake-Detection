@@ -1,447 +1,200 @@
-# DeepVision AI v2.0 Architecture
+# DeepVision AI — System Architecture & Technical Design
 
-> A Modular Explainable Deepfake Detection Framework using Vision Transformers, Temporal Modeling, and Explainable AI.
-
----
-
-# Overview
-
-DeepVision AI is a research-oriented and production-ready framework for detecting manipulated facial videos using deep learning.
-
-The framework is designed around modular engineering principles, allowing datasets, models, training pipelines, explainability techniques, and deployment components to evolve independently.
+> A Modular, Explainable Deepfake Detection Framework leveraging Vision Transformers, Temporal Pooling, and Grad-CAM Interpretation.
 
 ---
 
-# System Objectives
+## 1. System Overview
 
-The primary objectives of DeepVision AI are:
+**DeepVision AI** is an open-source research and engineering framework designed to detect AI-generated deepfake videos across benchmark datasets (FaceForensics++ and Celeb-DF v2).
 
-- Detect AI-generated deepfake videos.
-- Support multiple benchmark datasets.
-- Provide explainable predictions using Grad-CAM.
-- Enable reproducible deep learning experiments.
-- Provide a deployable real-time inference system.
+The repository is built around clean software engineering principles:
+- **Modular Pipeline Design**: Decoupled preprocessing, dataset loading, model architectures, training, evaluation, explainability, and inference.
+- **Config Driven Execution**: Centralized configuration management using YAML.
+- **Reproducibility**: Deterministic seed initialization, checkpoint management, and detailed experiment history logging.
+- **Explainability**: Integrated Grad-CAM visualization for interpretability of spatial facial feature anomalies.
 
 ---
 
-# System Architecture
+## 2. Overall Pipeline Architecture
 
 ```
-                        DeepVision AI
+                                 DeepVision AI
 
-                    Raw Video Dataset
-                           │
-                           ▼
-                Dataset Index Generator
-                           │
-                           ▼
-               outputs/dataset_index.csv
-                           │
-                           ▼
-                 Sequence Dataset Loader
-                           │
-                           ▼
-                 Balanced Data Sampler
-                           │
-                           ▼
-                     PyTorch DataLoader
-                           │
-                           ▼
-                     Training Engine
-                           │
-           ┌───────────────┴───────────────┐
-           ▼                               ▼
- EfficientNet + BiLSTM          Vision Transformer
-           │                               │
-           └───────────────┬───────────────┘
-                           ▼
-                    Classification Head
-                           │
-                           ▼
-                     Model Checkpoints
-                           │
-          ┌────────────────┴────────────────┐
-          ▼                                 ▼
-     Evaluation Engine                Inference Engine
-          │                                 │
-          ▼                                 ▼
-      Performance                     Grad-CAM
-      Metrics                         Visualization
-          │                                 │
-          └────────────────┬────────────────┘
-                           ▼
-                    Streamlit Application
+                             Raw Video Dataset
+                                    │
+                                    ▼
+                         Dataset Index Generator
+                       (src/datasets/tf_dataset_builder.py)
+                                    │
+                                    ▼
+                         outputs/dataset_index.csv
+                                    │
+                                    ▼
+                       Dataset Split Generator
+                       (src/datasets/split_generator.py)
+                                    │
+                                    ▼
+                         outputs/splits/{train,val,test}.csv
+                                    │
+                                    ▼
+                         Sequence Dataset Loader
+                       (src/datasets/sequence_dataset.py)
+                                    │
+                                    ▼
+                          Balanced Data Sampler
+                       (src/datasets/balanced_sampler.py)
+                                    │
+                                    ▼
+                         PyTorch DataLoader Factory
+                       (src/datasets/dataloader.py)
+                                    │
+                                    ▼
+                              Model Factory
+                        (src/models/model_factory.py)
+                                    │
+            ┌───────────────────────┴───────────────────────┐
+            ▼                                               ▼
+  ViT + Temporal Pooling                         EfficientNet + BiLSTM
+(src/models/vit_temporal_pooling.py)           (src/models/efficientnet_bilstm.py)
+            │                                               │
+            └───────────────────────┬───────────────────────┘
+                                    ▼
+                             Training Engine
+                         (src/training/trainer.py)
+                                    │
+                                    ▼
+                           Model Checkpoints
+                       (outputs/runs/run_*/best_model.pth)
+                                    │
+           ┌────────────────────────┴────────────────────────┐
+           ▼                                                 ▼
+    Evaluation Engine                                Inference Engine
+       (evaluate.py)                                   (predict.py)
+           │                                                 │
+           ▼                                                 ▼
+Metrics & ROC-AUC Reports                           Grad-CAM Heatmaps
+(outputs/evaluation/)                           (src/explainability/gradcam.py)
 ```
 
 ---
 
-# Repository Structure
+## 3. Core Model Architecture: ViT-B/16 + Temporal Pooling
+
+The primary canonical model architecture processes video sequences as follows:
 
 ```
-DeepVision-AI/
+Input Video Sequence: (B, T, C, H, W)
+         │
+         ▼
+Flatten Batch & Time: (B * T, C, H, W)
+         │
+         ▼
+Vision Transformer Backbone (ViT-B/16 ImageNet-1k)
+         │
+         ▼
+Per-Frame Feature Embedding: (B * T, 768)
+         │
+         ▼
+Restore Temporal Dimension: (B, T, 768)
+         │
+         ▼
+Temporal Mean Pooling: (B, 768)
+         │
+         ▼
+Classification Head: Linear(768 -> 256) -> ReLU -> Dropout(0.3) -> Linear(256 -> 2)
+         │
+         ▼
+Output Logits: (B, 2)
+```
 
-├── app/
-│
-├── assets/
-│
+---
+
+## 4. Alternate Model Architecture: EfficientNet-B2 + BiLSTM
+
+```
+Input Video Sequence: (B, T, C, H, W)
+         │
+         ▼
+Flatten Batch & Time: (B * T, C, H, W)
+         │
+         ▼
+EfficientNet-B2 Feature Extractor -> Adaptive Average Pooling: (B * T, 1408)
+         │
+         ▼
+Reshape Temporal Sequence: (B, T, 1408)
+         │
+         ▼
+Bidirectional LSTM (hidden_dim=256): (B, T, 512)
+         │
+         ▼
+Extract Final Timestep: (B, 512)
+         │
+         ▼
+Classification Head: Dropout(0.3) -> Linear(512 -> 2)
+         │
+         ▼
+Output Logits: (B, 2)
+```
+
+---
+
+## 5. Repository Structure
+
+```
+deepfake-detection/
 ├── configs/
-│
-├── data/
-│   ├── raw/
-│   ├── intermediate/
-│   └── processed/
-│
+│   ├── default.yaml            # Authoritative configuration file
+│   └── smoke_test.yaml         # Lightweight configuration for smoke testing
 ├── docs/
-│
-├── outputs/
-│
+│   └── ARCHITECTURE.md         # System design documentation
 ├── src/
-│
-├── tests/
-│
-├── train.py
-├── evaluate.py
-├── predict.py
-└── README.md
+│   ├── datasets/
+│   │   ├── balanced_sampler.py # WeightedRandomSampler for class balancing
+│   │   ├── dataloader.py       # DataLoader factory function
+│   │   ├── sequence_dataset.py # PyTorch Dataset for .npy sequences
+│   │   ├── split_generator.py  # Stratified split generator
+│   │   └── tf_dataset_builder.py # Metadata dataset indexer
+│   ├── explainability/
+│   │   └── gradcam.py          # Grad-CAM heatmap overlay visualizer
+│   ├── inference/
+│   │   └── predictor.py        # Multi-clip video predictor engine
+│   ├── models/
+│   │   ├── base_model.py       # Abstract base model class
+│   │   ├── efficientnet_bilstm.py # Hybrid EfficientNet-BiLSTM model
+│   │   ├── model_factory.py    # Dynamic model creation factory
+│   │   └── vit_temporal_pooling.py # Vision Transformer with Temporal Mean Pooling
+│   ├── preprocessing/
+│   │   ├── extract_frames.py   # Video frame extraction tool
+│   │   ├── face_align_mtcnn.py # Face detection and alignment via MTCNN
+│   │   └── make_sequences.py   # Uniform sequence sampling and .npy exporter
+│   ├── training/
+│   │   ├── base_trainer.py     # Base trainer interface
+│   │   ├── callbacks.py        # Callback manager system
+│   │   ├── checkpoint.py       # Checkpoint and artifact manager
+│   │   ├── early_stopping.py   # Early stopping handler
+│   │   ├── history.py          # Training metrics recorder
+│   │   ├── metrics.py          # Batch & epoch metrics computer
+│   │   ├── optimizer_factory.py# Optimizer creation factory
+│   │   ├── scheduler_factory.py# Learning rate scheduler factory
+│   │   ├── state.py            # Training state tracking data class
+│   │   └── trainer.py          # Main training execution engine
+│   └── utils/
+│       ├── config.py           # Configuration YAML parser
+│       └── logger.py           # Standardized logger creator
+├── tests/                      # PyTorch & system unit test suite
+├── train.py                    # Main training execution script
+├── evaluate.py                 # Evaluation & metrics generation script
+├── predict.py                  # Single video inference CLI tool
+├── environment.yml             # Conda environment specification
+├── requirements.txt            # Python dependencies
+└── README.md                   # Primary repository portfolio documentation
 ```
 
 ---
 
-# Source Code Architecture
-
-```
-src/
-
-datasets/
-    dataset_indexer.py
-    sequence_dataset.py
-    balanced_sampler.py
-    dataloader.py
-
-models/
-    vit_temporal_pooling.py
-    efficientnet_bilstm.py
-    model_factory.py
-
-training/
-    trainer.py
-    checkpoint.py
-    early_stopping.py
-
-evaluation/
-    evaluator.py
-    metrics.py
-
-explainability/
-    gradcam.py
-
-inference/
-    predictor.py
-
-utils/
-    config.py
-    logger.py
-```
-
----
-
-# Data Pipeline
-
-```
-Raw Videos
-      │
-      ▼
-Video Indexing
-      │
-      ▼
-Sequence Generation (.npy)
-      │
-      ▼
-Sequence Dataset
-      │
-      ▼
-Balanced Sampling
-      │
-      ▼
-PyTorch DataLoader
-      │
-      ▼
-Model Training
-```
-
----
-
-# Model Pipeline
-
-```
-Sequence
-
-↓
-
-Vision Transformer
-
-↓
-
-Temporal Pooling
-
-↓
-
-Classification Head
-
-↓
-
-Prediction
-```
-
----
-
-# Training Pipeline
-
-```
-Load Configuration
-
-↓
-
-Load Dataset
-
-↓
-
-Create DataLoader
-
-↓
-
-Initialize Model
-
-↓
-
-Training Loop
-
-↓
-
-Validation
-
-↓
-
-Checkpoint Saving
-
-↓
-
-Performance Metrics
-```
-
----
-
-# Evaluation Pipeline
-
-```
-Model
-
-↓
-
-Test Dataset
-
-↓
-
-Predictions
-
-↓
-
-Accuracy
-
-↓
-
-Precision
-
-↓
-
-Recall
-
-↓
-
-F1 Score
-
-↓
-
-ROC Curve
-
-↓
-
-Confusion Matrix
-```
-
----
-
-# Explainability Pipeline
-
-```
-Input Sequence
-
-↓
-
-Forward Pass
-
-↓
-
-Target Layer
-
-↓
-
-Grad-CAM
-
-↓
-
-Heatmap
-
-↓
-
-Overlay
-
-↓
-
-Visualization
-```
-
----
-
-# Deployment Pipeline
-
-```
-Upload Video
-
-↓
-
-Face Extraction
-
-↓
-
-Sequence Generation
-
-↓
-
-Model Prediction
-
-↓
-
-Grad-CAM
-
-↓
-
-Confidence Score
-
-↓
-
-Download Report
-```
-
----
-
-# Engineering Principles
-
-The project follows the following principles:
-
-- Modular Architecture
-- Configuration Driven
-- Test Driven
-- Reproducible Experiments
-- Clean Separation of Responsibilities
-- Research Friendly
-- Deployment Ready
-
----
-
-# Development Workflow
-
-```
-feature/*
-
-↓
-
-develop
-
-↓
-
-main
-```
-
-Each feature is implemented independently, tested, reviewed, and merged into the development branch before being promoted to the main branch.
-
----
-
-# Supported Datasets
-
-Current datasets:
-
-- FaceForensics++
-- Celeb-DF v2
-
-Planned support:
-
-- DFDC
-- WildDeepfake
-- ForgeryNet
-- DeeperForensics-1.0
-
----
-
-# Current Progress
-
-## Sprint 1
-
-- Repository Recovery
-- Development Environment
-- Configuration System
-
-## Sprint 2
-
-- Dataset Index Builder
-- Sequence Dataset
-- Dataset Metadata Generator
-
-## Sprint 3
-
-- Balanced Sampler (In Progress)
-- DataLoader
-- Training Engine
-
-## Sprint 4
-
-- Vision Transformer Integration
-- EfficientNet-BiLSTM
-- Model Factory
-
-## Sprint 5
-
-- Evaluation Pipeline
-
-## Sprint 6
-
-- Explainability
-
-## Sprint 7
-
-- Streamlit Deployment
-
----
-
-# Future Improvements
-
-- Multi-GPU Training
-- Mixed Precision Training
-- Distributed Training
-- Self-Supervised Pretraining
-- Transformer Ensemble
-- Model Quantization
-- ONNX Export
-- TensorRT Deployment
-
----
-
-# Citation
-
-If you use this framework in research, please cite the repository after publication.
-
----
-
-# License
-
-This project will be released under the MIT License.
+## 6. Development & Verification Principles
+
+- **Reproducibility**: All dataset splitting and training initialization support explicit random seeds.
+- **Fail-Safe Processing**: Data loading and evaluation handle single-class datasets, missing files, and CPU fallbacks gracefully.
+- **Test-Driven Rigor**: Standardized unit tests verify configuration, dataset loading, model factory instantiation, forward passes, metric calculations, checkpointing, and inference.

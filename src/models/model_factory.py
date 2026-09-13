@@ -9,29 +9,40 @@ from src.models.efficientnet_bilstm import EfficientNetBiLSTM
 
 
 class ModelFactory:
+    """
+    Factory for instantiating deepfake detection models based on configuration.
+    """
 
     @staticmethod
-    def create(config):
+    def create(config: dict):
+        """
+        Create a model instance based on the configuration dictionary.
 
+        Args:
+            config (dict): Configuration options containing 'model' and 'dataset' sections.
+
+        Returns:
+            nn.Module: Instantiated PyTorch model.
+        """
         model_name = config["model"]["name"].lower()
 
-        
-        if model_name == "vit_temporal_pooling":
-
+        if model_name in ("vit_temporal_pooling", "vit"):
             return ViTTemporalPooling(
-                image_size=config["dataset"]["image_size"],
-                num_classes=config["model"]["num_classes"],
-                pretrained=config["model"]["pretrained"],
-                freeze_backbone=config["model"]["freeze_backbone"],
-                pooling=config["model"]["pooling"],
-                hidden_dim=config["model"]["hidden_dim"],
-                dropout=config["model"]["dropout"],
-        )
+                image_size=config["dataset"].get("image_size", 224),
+                num_classes=config["model"].get("num_classes", 2),
+                pretrained=config["model"].get("pretrained", True),
+                freeze_backbone=config["model"].get("freeze_backbone", True),
+                pooling=config["model"].get("pooling", "mean"),
+                hidden_dim=config["model"].get("hidden_dim", 256),
+                dropout=config["model"].get("dropout", 0.3),
+            )
 
-        elif model_name == "efficientnet_bilstm":
+        elif model_name in ("efficientnet_bilstm", "efficientnet"):
+            return EfficientNetBiLSTM(
+                num_classes=config["model"].get("num_classes", 2),
+                hidden_dim=config["model"].get("hidden_dim", 256),
+                dropout=config["model"].get("dropout", 0.3),
+                freeze_backbone=config["model"].get("freeze_backbone", True),
+            )
 
-            return EfficientNetBiLSTM()
-
-        raise ValueError(
-            f"Unsupported model: {model_name}"
-        )
+        raise ValueError(f"Unsupported model name: '{model_name}'. Options: 'vit_temporal_pooling', 'efficientnet_bilstm'")

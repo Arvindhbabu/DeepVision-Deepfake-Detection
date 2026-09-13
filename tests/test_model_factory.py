@@ -1,19 +1,43 @@
+import unittest
+import torch
 from src.utils.config import load_config
 from src.models.model_factory import ModelFactory
+from src.models.vit_temporal_pooling import ViTTemporalPooling
+from src.models.efficientnet_bilstm import EfficientNetBiLSTM
 
 
-def main():
+class TestModelFactory(unittest.TestCase):
 
-    config = load_config()
+    def setUp(self):
+        self.config_vit = load_config("configs/smoke_test.yaml")
+        self.config_effnet = {
+            "model": {
+                "name": "efficientnet_bilstm",
+                "num_classes": 2,
+                "hidden_dim": 128,
+                "dropout": 0.3,
+                "freeze_backbone": True,
+            },
+            "dataset": {
+                "image_size": 224,
+            }
+        }
 
-    model = ModelFactory.create(config)
+    def test_create_vit_temporal_pooling(self):
+        model = ModelFactory.create(self.config_vit)
+        self.assertIsInstance(model, ViTTemporalPooling)
+        self.assertEqual(model.name, "ViTTemporalPooling")
 
-    print("\nModel Loaded Successfully\n")
+    def test_create_efficientnet_bilstm(self):
+        model = ModelFactory.create(self.config_effnet)
+        self.assertIsInstance(model, EfficientNetBiLSTM)
+        self.assertEqual(model.name, "EfficientNetBiLSTM")
 
-    print(type(model))
-
-    print(model.name)
+    def test_invalid_model_raises(self):
+        invalid_config = {"model": {"name": "invalid_model_xyz"}}
+        with self.assertRaises(ValueError):
+            ModelFactory.create(invalid_config)
 
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

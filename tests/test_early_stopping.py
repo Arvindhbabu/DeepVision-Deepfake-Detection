@@ -1,41 +1,25 @@
+import unittest
 from src.training.early_stopping import EarlyStopping
 
 
-def main():
+class TestEarlyStopping(unittest.TestCase):
 
-    early_stop = EarlyStopping(
-        patience=3,
-        min_delta=0.001,
-    )
+    def test_early_stopping_trigger(self):
+        early_stop = EarlyStopping(patience=3, min_delta=0.001)
 
-    losses = [
-        0.70,
-        0.55,
-        0.40,
-        0.35,
-        0.33,
-        0.331,
-        0.332,
-        0.335,
-        0.340,
-    ]
+        losses = [0.70, 0.55, 0.40, 0.35, 0.35, 0.35, 0.35]
+        stop_triggered = False
+        triggered_epoch = None
 
-    print("Validation Loss Progress\n")
+        for idx, loss in enumerate(losses, start=1):
+            if early_stop(loss):
+                stop_triggered = True
+                triggered_epoch = idx
+                break
 
-    for epoch, loss in enumerate(losses, start=1):
-
-        stop = early_stop(loss)
-
-        print(
-            f"Epoch {epoch:02d} | Loss = {loss:.4f}"
-        )
-
-        if stop:
-
-            print("\nEarly stopping triggered.")
-
-            break
+        self.assertTrue(stop_triggered)
+        self.assertEqual(triggered_epoch, 7)
 
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

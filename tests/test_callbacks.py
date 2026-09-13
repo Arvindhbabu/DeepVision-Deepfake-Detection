@@ -1,43 +1,42 @@
-from src.training.callbacks import Callback
-from src.training.callbacks import CallbackManager
+import unittest
+from src.training.callbacks import Callback, CallbackManager
 
 
-class PrintCallback(Callback):
+class DummyCallback(Callback):
+    def __init__(self):
+        self.events = []
 
     def on_train_begin(self, trainer):
-        print("Training Started")
+        self.events.append("train_begin")
 
     def on_epoch_begin(self, trainer):
-        print("Epoch Started")
+        self.events.append("epoch_begin")
 
     def on_epoch_end(self, trainer):
-        print("Epoch Finished")
-
-    def on_validation_end(self, trainer):
-        print("Validation Finished")
+        self.events.append("epoch_end")
 
     def on_train_end(self, trainer):
-        print("Training Finished")
+        self.events.append("train_end")
 
 
-def main():
+class TestCallbacks(unittest.TestCase):
 
-    manager = CallbackManager()
+    def test_callback_manager_events(self):
+        manager = CallbackManager()
+        cb = DummyCallback()
+        manager.add(cb)
 
-    manager.add(PrintCallback())
+        fake_trainer = None
+        manager.on_train_begin(fake_trainer)
+        manager.on_epoch_begin(fake_trainer)
+        manager.on_epoch_end(fake_trainer)
+        manager.on_train_end(fake_trainer)
 
-    trainer = object()
-
-    manager.on_train_begin(trainer)
-
-    manager.on_epoch_begin(trainer)
-
-    manager.on_epoch_end(trainer)
-
-    manager.on_validation_end(trainer)
-
-    manager.on_train_end(trainer)
+        self.assertEqual(
+            cb.events,
+            ["train_begin", "epoch_begin", "epoch_end", "train_end"]
+        )
 
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

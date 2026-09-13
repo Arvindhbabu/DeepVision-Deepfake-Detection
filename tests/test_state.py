@@ -1,39 +1,19 @@
+import unittest
 from src.training.state import TrainingState
 
 
-def main():
+class TestTrainingState(unittest.TestCase):
 
-    state = TrainingState()
+    def test_training_state_update(self):
+        state = TrainingState()
+        state.update(epoch=5, global_step=100, best_val_loss=0.25, resumed=True)
 
-    state.update(
-
-        epoch=5,
-
-        global_step=340,
-
-        best_val_loss=0.248,
-
-        best_val_accuracy=94.75,
-
-        learning_rate=1e-4,
-
-        resumed=True,
-
-    )
-
-    print()
-
-    print("Training State")
-
-    print("=" * 50)
-
-    for key, value in state.to_dict().items():
-
-        print(f"{key:25}: {value}")
-
-    print("=" * 50)
+        state_dict = state.to_dict()
+        self.assertEqual(state_dict["epoch"], 5)
+        self.assertEqual(state_dict["global_step"], 100)
+        self.assertAlmostEqual(state_dict["best_val_loss"], 0.25)
+        self.assertTrue(state_dict["resumed"])
 
 
 if __name__ == "__main__":
-
-    main()
+    unittest.main()

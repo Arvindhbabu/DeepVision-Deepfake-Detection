@@ -333,4 +333,4 @@ This project is released under the [MIT License](LICENSE).
 
 **Arvindh Babu V** — AI & Data Science Student  
 *GitHub*: [Arvindhbabu](https://github.com/Arvindhbabu)  
-*Repository*: [DeepVision AI](https://github.com/Arvindhbabu/DeepVision-AI)
+*Repository*: [DeepVision AI](https://github.com/Arvindhbabu/DeepVision-Deepfake-Detection)

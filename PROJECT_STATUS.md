@@ -1,10 +1,10 @@
 # DeepVision AI — Implementation Status & Roadmap
 
-> Accurate status summary of implemented, tested, experimental, and planned system components.
+> Accurate status summary of implemented, verified, experimental, and planned system components.
 
 ---
 
-## 1. Implemented Components
+## 1. Implemented
 
 - **Dataset Indexer & Metadata Generator**: `src/datasets/tf_dataset_builder.py`
 - **Stratified Split Generator**: `src/datasets/split_generator.py`
@@ -22,25 +22,26 @@
 
 ---
 
-## 2. Tested Components
+## 2. Verified
 
-- **Unit Test Suite**: 23 test modules in `tests/` covering config loading, dataset construction, sequence shapes, model factory, forward passes, metric calculations, checkpointing, trainer loops, inference, and explainability.
+- **Unit Test Suite**: 32 unit tests across 23 test modules in `tests/` passing cleanly offline (`32/32 tests passing`).
 - **CPU Training Smoke Test**: 1-epoch execution on CPU via `python train.py --config configs/smoke_test.yaml --synthetic-fallback`.
-- **CPU Evaluation Smoke Test**: Complete test set evaluation & metric reporting via `evaluate.py`.
-- **Inference Pipeline Smoke Test**: Multi-clip sequence tensor inference via `predict.py`.
-- **Automated CI**: GitHub Actions workflow in `.github/workflows/ci.yml`.
+- **CPU Evaluation Smoke Test**: Metric output, confusion matrix plot, and ROC plot generation via `evaluate.py`.
+- **Inference Pipeline Validation**: Multi-clip sequence tensor inference via `predict.py`.
+- **Grad-CAM Explainability Validation**: Spatial attention map shape `(224, 224)` and layer hook execution verified.
+- **Automated CI Workflow**: GitHub Actions workflow in `.github/workflows/ci.yml`.
 
 ---
 
-## 3. Experimental Components
+## 3. Experimental / Under Evaluation
 
-- **Multi-Dataset Cross Evaluation**: Benchmarking models trained on FF++ against unseen Celeb-DF v2 splits.
+- **FaceForensics++ & Celeb-DF v2 Benchmark Evaluation**: Full dataset training and cross-dataset evaluation across real video splits.
 - **Layer-Specific Grad-CAM Target Tuning**: Comparing activation heatmaps across different Vision Transformer projection blocks.
 
 ---
 
-## 4. Planned Roadmap
+## 4. Planned
 
-- [ ] Streamlit interactive web deployment interface.
+- [ ] Streamlit interactive web interface.
 - [ ] 3D CNN spatio-temporal backbones (ResNet3D, SlowFast).
-- [ ] Model quantization & ONNX runtime export for real-time mobile/edge inference.
+- [ ] Model quantization & ONNX runtime export for real-time edge inference.

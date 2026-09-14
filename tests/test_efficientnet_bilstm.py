@@ -10,6 +10,7 @@ class TestEfficientNetBiLSTM(unittest.TestCase):
             num_classes=2,
             hidden_dim=64,
             dropout=0.1,
+            pretrained=False,
             freeze_backbone=True,
         )
 

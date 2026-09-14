@@ -16,6 +16,7 @@ class TestModelFactory(unittest.TestCase):
                 "num_classes": 2,
                 "hidden_dim": 128,
                 "dropout": 0.3,
+                "pretrained": False,
                 "freeze_backbone": True,
             },
             "dataset": {

@@ -43,6 +43,14 @@ class SequenceDataset(Dataset):
         else:
             self.data = pd.DataFrame(columns=["dataset", "video_name", "label"])
 
+        if len(self.data) == 0 and self.synthetic_if_missing:
+            synthetic_rows = [
+                {"dataset": "ffpp", "video_name": f"syn_real_{i}", "label": 0} for i in range(10)
+            ] + [
+                {"dataset": "ffpp", "video_name": f"syn_fake_{i}", "label": 1} for i in range(10)
+            ]
+            self.data = pd.DataFrame(synthetic_rows)
+
     def __len__(self) -> int:
         return len(self.data)
 

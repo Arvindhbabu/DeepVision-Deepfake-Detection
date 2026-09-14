@@ -23,7 +23,7 @@ class EfficientNetBiLSTM(BaseModel):
         hidden_dim: int = 256,
         num_layers: int = 1,
         dropout: float = 0.3,
-        pretrained: bool = True,
+        pretrained: bool = False,
         freeze_backbone: bool = True,
     ):
         super().__init__()

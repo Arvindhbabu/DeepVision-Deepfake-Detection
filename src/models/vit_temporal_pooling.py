@@ -20,7 +20,7 @@ class ViTTemporalPooling(BaseModel):
         self,
         image_size=224,
         num_classes=2,
-        pretrained=True,
+        pretrained=False,
         freeze_backbone=True,
         pooling="mean",
         hidden_dim=256,

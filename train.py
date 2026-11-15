@@ -117,7 +117,9 @@ def main():
 
     config = load_config(args.config)
 
-    logger = create_logger()
+    log_dir = Path(config["paths"].get("logs", "outputs/logs"))
+    log_dir.mkdir(parents=True, exist_ok=True)
+    logger = create_logger(log_dir=log_dir, log_name="train.log")
 
     logger.info("=" * 60)
     logger.info("DeepVision AI — Training System")
@@ -186,7 +188,9 @@ def main():
         "trainable_parameters": trainable_params,
     }
 
-    checkpoint_manager = CheckpointManager()
+    runs_dir = Path(config["paths"].get("runs", Path(config["paths"].get("outputs", "outputs")) / "runs"))
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_manager = CheckpointManager(root_dir=runs_dir)
     checkpoint_manager.save_config(config)
 
     logger.info(f"Experiment Folder  : {checkpoint_manager.path}")
@@ -262,7 +266,7 @@ def main():
         raise e
     finally:
         try:
-            checkpoint_manager.copy_log("outputs/logs/train.log")
+            checkpoint_manager.copy_log(log_dir / "train.log")
         except Exception:
             pass
 

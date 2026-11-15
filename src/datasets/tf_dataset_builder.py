@@ -93,13 +93,18 @@ class DatasetIndexer:
                         in self.VIDEO_EXTENSIONS
                     ):
 
+                        try:
+                            video_path_str = str(video_file.relative_to(self.root_dir)).replace("\\", "/")
+                        except ValueError:
+                            video_path_str = str(video_file).replace("\\", "/")
+
                         self.samples.append(
                             {
                                 "dataset": dataset_name,
                                 "category": category,
                                 "label": label,
                                 "video_name": video_file.stem,
-                                "video_path": str(video_file.resolve()),
+                                "video_path": video_path_str,
                             }
                         )
 

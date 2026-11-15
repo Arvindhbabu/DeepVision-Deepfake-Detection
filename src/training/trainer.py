@@ -148,7 +148,8 @@ class Trainer(BaseTrainer):
 
     def train(self, epochs):
 
-        self.state.best_val_loss = float("inf")
+        if self.state.best_val_loss is None:
+            self.state.best_val_loss = float("inf")
 
         self.logger.info("Training Started")
 

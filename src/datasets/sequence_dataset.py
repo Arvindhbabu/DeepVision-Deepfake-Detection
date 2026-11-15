@@ -30,7 +30,7 @@ class SequenceDataset(Dataset):
         sequence_root: Union[str, Path] = "data/intermediate/sequences",
         image_size: int = 224,
         synthetic_if_missing: bool = False,
-        sequence_length: int = 26,
+        sequence_length: int = 30,
     ):
         self.csv_path = Path(csv_file)
         self.sequence_root = Path(sequence_root)
@@ -40,8 +40,15 @@ class SequenceDataset(Dataset):
 
         if self.csv_path.exists():
             self.data = pd.read_csv(self.csv_path)
+        elif self.synthetic_if_missing:
+            synthetic_rows = [
+                {"dataset": "ffpp", "video_name": f"syn_real_{i}", "label": 0} for i in range(10)
+            ] + [
+                {"dataset": "ffpp", "video_name": f"syn_fake_{i}", "label": 1} for i in range(10)
+            ]
+            self.data = pd.DataFrame(synthetic_rows)
         else:
-            self.data = pd.DataFrame(columns=["dataset", "video_name", "label"])
+            raise FileNotFoundError(f"Dataset split CSV not found: {self.csv_path}")
 
         if len(self.data) == 0 and self.synthetic_if_missing:
             synthetic_rows = [
@@ -58,8 +65,25 @@ class SequenceDataset(Dataset):
         dataset = str(row["dataset"]).lower()
         folder = "ffpp" if "ffpp" in dataset else "celebdf"
 
-        video_name = row["video_name"]
-        npy_path = self.sequence_root / folder / f"{video_name}.npy"
+        video_name = str(row["video_name"])
+        clean_name = video_name[:-4] if video_name.endswith(".npy") else video_name
+
+        # Support direct sequence_path if available in row
+        if "sequence_path" in row and pd.notnull(row["sequence_path"]):
+            direct_p = Path(str(row["sequence_path"]))
+            if direct_p.exists():
+                npy_path = direct_p
+            elif (self.sequence_root / folder / f"{clean_name}.npy").exists():
+                npy_path = self.sequence_root / folder / f"{clean_name}.npy"
+            elif (self.sequence_root / f"{clean_name}.npy").exists():
+                npy_path = self.sequence_root / f"{clean_name}.npy"
+            else:
+                npy_path = direct_p
+        else:
+            # Support both subfolder hierarchy (root/folder/name.npy) and flat root (root/name.npy)
+            npy_path = self.sequence_root / folder / f"{clean_name}.npy"
+            if not npy_path.exists() and (self.sequence_root / f"{clean_name}.npy").exists():
+                npy_path = self.sequence_root / f"{clean_name}.npy"
 
         if not npy_path.exists():
             if self.synthetic_if_missing:
@@ -77,6 +101,13 @@ class SequenceDataset(Dataset):
                     0, 256, (self.sequence_length, self.image_size, self.image_size, 3), dtype=np.uint8
                 )
             raise RuntimeError(f"Failed loading sequence file: {npy_path}") from e
+
+        # Guard against zero-filled placeholder arrays in real training
+        if not self.synthetic_if_missing and sequence.max() == 0 and sequence.min() == 0:
+            raise ValueError(
+                f"Invalid sequence data in '{npy_path}': array is entirely zero-filled placeholder data. "
+                "Ensure only validated non-zero sequences are loaded for training."
+            )
 
         return sequence
 

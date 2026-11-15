@@ -1,11 +1,25 @@
 """
-DeepVision AI Evaluation Package
+DeepVision AI Evaluation Package.
 """
 
-from evaluate import compute_metrics, run_evaluation_inference, load_model
+from src.evaluation.evaluator import (
+    load_model,
+    run_evaluation_inference,
+    compute_metrics,
+    plot_confusion_matrix,
+    plot_roc,
+    save_predictions,
+    evaluate,
+    get_device,
+)
 
 __all__ = [
-    "compute_metrics",
-    "run_evaluation_inference",
     "load_model",
+    "run_evaluation_inference",
+    "compute_metrics",
+    "plot_confusion_matrix",
+    "plot_roc",
+    "save_predictions",
+    "evaluate",
+    "get_device",
 ]

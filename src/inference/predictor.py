@@ -33,7 +33,7 @@ class DeepfakePredictor:
 
         self.config = config
         self.image_size = config["dataset"].get("image_size", 224)
-        self.seq_len = config["dataset"].get("sequence_length", 26)
+        self.seq_len = config["dataset"].get("sequence_length", 30)
 
         self.model = ModelFactory.create(config)
         checkpoint = torch.load(checkpoint_path, map_location=self.device)

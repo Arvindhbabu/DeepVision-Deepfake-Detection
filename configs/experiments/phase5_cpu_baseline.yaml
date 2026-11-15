@@ -1,0 +1,55 @@
+project:
+  name: DeepVision AI
+  version: 2.0
+  experiment: phase5_cpu_baseline
+
+paths:
+  raw_data: data/raw
+  processed_data: data/processed
+  sequences: data/intermediate/sequences
+  splits: outputs/splits
+  outputs: outputs/experiments/phase5_cpu_baseline
+  checkpoints: outputs/experiments/phase5_cpu_baseline/checkpoints
+  runs: outputs/experiments/phase5_cpu_baseline/runs
+  logs: outputs/experiments/phase5_cpu_baseline/logs
+  metrics: outputs/experiments/phase5_cpu_baseline/metrics
+  predictions: outputs/experiments/phase5_cpu_baseline/predictions
+
+dataset:
+  name: FFPP_CelebDF
+  image_size: 224
+  sequence_length: 30
+  fps: 5
+
+dataloader:
+  batch_size: 4
+  num_workers: 0
+  pin_memory: false
+  drop_last: false
+
+training:
+  epochs: 1
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  optimizer: AdamW
+  scheduler: CosineAnnealingLR
+  early_stopping_patience: 3
+
+model:
+  name: efficientnet_bilstm
+  pretrained: false
+  freeze_backbone: true
+  num_classes: 2
+  hidden_dim: 128
+  dropout: 0.3
+
+evaluation:
+  metrics:
+    - accuracy
+    - precision
+    - recall
+    - f1
+    - auc
+    - specificity
+    - balanced_accuracy
+

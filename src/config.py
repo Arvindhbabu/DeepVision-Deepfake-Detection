@@ -1,22 +1,42 @@
+"""
+DeepVision AI — Legacy Configuration Bridge.
+
+Preserves backward compatibility for preprocessing and standalone scripts
+by synchronizing with the canonical configuration system in `src.utils.config`.
+"""
+
 import os
+from pathlib import Path
+from src.utils.config import load_config
 
-# Paths (change base path if your project in different location)
-BASE_DIR = os.path.abspath(os.path.join(os.getcwd()))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-RAW_FFPP = os.path.join(DATA_DIR, "raw", "ffpp_c23")
-RAW_CELEBDF = os.path.join(DATA_DIR, "raw", "celebdf_v2_sampled")
+# Attempt to load canonical configuration
+try:
+    _cfg = load_config()
+except Exception:
+    _cfg = {}
 
-INTERMEDIATE_DIR = os.path.join(DATA_DIR, "intermediate")
-FRAMES_DIR = os.path.join(INTERMEDIATE_DIR, "frames")
-ALIGNED_DIR = os.path.join(INTERMEDIATE_DIR, "aligned_faces")
-SEQS_DIR = os.path.join(INTERMEDIATE_DIR, "sequences")
+_paths = _cfg.get("paths", {})
+_dataset = _cfg.get("dataset", {})
+_dataloader = _cfg.get("dataloader", {})
 
-# Preprocessing params
-FPS = 5                # frames per second to extract
-SEQ_LEN = 30           # T = 30
-INPUT_SIZE = 260       # CNN input H/W
-MIN_FRAMES = 40        # skip videos shorter than this (optional)
-NUM_WORKERS = 4
+# Base directories
+BASE_DIR = str(Path(os.getcwd()).resolve())
+DATA_DIR = str(Path(_paths.get("data_root", Path(BASE_DIR) / "data")).resolve())
+RAW_FFPP = str(Path(_paths.get("raw_data", Path(DATA_DIR) / "raw")) / "ffpp_c23")
+RAW_CELEBDF = str(Path(_paths.get("raw_data", Path(DATA_DIR) / "raw")) / "celebdf_v2_sampled")
 
-# output formats
-SEQ_SAVE_FORMAT = "npy"    # or 'tfrecord'
+INTERMEDIATE_DIR = str(Path(DATA_DIR) / "intermediate")
+FRAMES_DIR = str(Path(INTERMEDIATE_DIR) / "frames")
+ALIGNED_DIR = str(Path(INTERMEDIATE_DIR) / "aligned_faces")
+SEQS_DIR = str(Path(_paths.get("sequences", Path(INTERMEDIATE_DIR) / "sequences")).resolve())
+
+# Preprocessing parameters
+FPS = int(_dataset.get("fps", 5))
+SEQ_LEN = int(_dataset.get("sequence_length", 30))
+INPUT_SIZE = int(_dataset.get("image_size", 224))
+MIN_FRAMES = 40
+NUM_WORKERS = int(_dataloader.get("num_workers", 0))
+
+# Output formats
+SEQ_SAVE_FORMAT = "npy"
+

@@ -23,14 +23,24 @@ def create_dataloaders(config: dict, synthetic_fallback: bool = False):
         tuple: (train_loader, val_loader, test_loader)
     """
     image_size = config["dataset"].get("image_size", 224)
-    seq_len = config["dataset"].get("sequence_length", 26)
+    seq_len = config["dataset"].get("sequence_length", 30)
     batch_size = config["dataloader"].get("batch_size", 2)
     num_workers = config["dataloader"].get("num_workers", 0)
-    pin_memory = config["dataloader"].get("pin_memory", True)
+    # CPU compatibility: only pin memory if CUDA is actually available
+    import torch
+    pin_memory = config["dataloader"].get("pin_memory", True) and torch.cuda.is_available()
     drop_last = config["dataloader"].get("drop_last", False)
 
-    seq_root = config["paths"].get("sequences", "data/intermediate/sequences")
-    splits_dir = Path(config["paths"].get("outputs", "outputs")) / "splits"
+    seq_root = Path(config["paths"].get("sequences", "data/intermediate/sequences"))
+
+    # Resolve splits directory with fallback to default repository location
+    splits_config = config["paths"].get("splits")
+    if splits_config:
+        splits_dir = Path(splits_config)
+    else:
+        splits_dir = Path(config["paths"].get("outputs", "outputs")) / "splits"
+        if not splits_dir.exists() and Path("outputs/splits").exists():
+            splits_dir = Path("outputs/splits")
 
     train_csv = splits_dir / "train.csv"
     val_csv = splits_dir / "val.csv"

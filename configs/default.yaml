@@ -18,7 +18,7 @@ dataset:
 
   image_size: 224
 
-  sequence_length: 26
+  sequence_length: 30
 
   fps: 5
 

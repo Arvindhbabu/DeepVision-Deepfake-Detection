@@ -20,13 +20,13 @@ class DatasetSplitGenerator:
         output_dir="outputs/splits",
         random_state=42,
     ):
-
-        self.input_csv = input_csv
+        self.input_csv = Path(input_csv)
         self.output_dir = Path(output_dir)
         self.random_state = random_state
 
     def generate(self):
-
+        if not self.input_csv.exists():
+            raise FileNotFoundError(f"Input CSV not found: {self.input_csv}")
         df = pd.read_csv(self.input_csv)
 
         train_df, temp_df = train_test_split(

@@ -31,12 +31,14 @@ class SequenceDataset(Dataset):
         image_size: int = 224,
         synthetic_if_missing: bool = False,
         sequence_length: int = 30,
+        imagenet_normalize: bool = False,
     ):
         self.csv_path = Path(csv_file)
         self.sequence_root = Path(sequence_root)
         self.image_size = image_size
         self.synthetic_if_missing = synthetic_if_missing
         self.sequence_length = sequence_length
+        self.imagenet_normalize = imagenet_normalize
 
         if self.csv_path.exists():
             self.data = pd.read_csv(self.csv_path)
@@ -71,8 +73,13 @@ class SequenceDataset(Dataset):
         # Support direct sequence_path if available in row
         if "sequence_path" in row and pd.notnull(row["sequence_path"]):
             direct_p = Path(str(row["sequence_path"]))
-            if direct_p.exists():
-                npy_path = direct_p
+            # Allow paths relative to the split CSV, its dataset parent, or the sequence root.
+            candidates = [direct_p, self.csv_path.parent / direct_p,
+                          self.csv_path.parent.parent / direct_p,
+                          self.sequence_root / direct_p]
+            resolved = next((p for p in candidates if p.is_file()), None)
+            if resolved is not None:
+                npy_path = resolved
             elif (self.sequence_root / folder / f"{clean_name}.npy").exists():
                 npy_path = self.sequence_root / folder / f"{clean_name}.npy"
             elif (self.sequence_root / f"{clean_name}.npy").exists():
@@ -94,7 +101,7 @@ class SequenceDataset(Dataset):
             raise FileNotFoundError(f"Sequence file not found: {npy_path}")
 
         try:
-            sequence = np.load(npy_path)
+            sequence = np.load(npy_path, allow_pickle=False)
         except Exception as e:
             if self.synthetic_if_missing:
                 return np.random.randint(
@@ -102,6 +109,10 @@ class SequenceDataset(Dataset):
                 )
             raise RuntimeError(f"Failed loading sequence file: {npy_path}") from e
 
+        if sequence.ndim != 4 or sequence.shape[-1] != 3 or sequence.shape[0] == 0:
+            raise ValueError(f"Invalid sequence shape: {sequence.shape} in {npy_path}")
+        if not np.issubdtype(sequence.dtype, np.number) or not np.isfinite(sequence).all():
+            raise ValueError(f"Invalid sequence values in {npy_path}")
         # Guard against zero-filled placeholder arrays in real training
         if not self.synthetic_if_missing and sequence.max() == 0 and sequence.min() == 0:
             raise ValueError(
@@ -131,6 +142,10 @@ class SequenceDataset(Dataset):
         # Normalize [0, 1]
         sequence = sequence.astype(np.float32) / 255.0
         tensor_seq = torch.from_numpy(sequence).permute(0, 3, 1, 2).contiguous()
+        if self.imagenet_normalize:
+            mean = tensor_seq.new_tensor((0.485, 0.456, 0.406)).view(1, 3, 1, 1)
+            std = tensor_seq.new_tensor((0.229, 0.224, 0.225)).view(1, 3, 1, 1)
+            tensor_seq = (tensor_seq - mean) / std
 
         label = torch.tensor(int(row["label"]), dtype=torch.long)
 

@@ -18,7 +18,8 @@ mtcnn = MTCNN(
     image_size=INPUT_SIZE,
     margin=0,
     keep_all=False,
-    device=device
+    device=device,
+    post_process=False,  # Return pixel intensities rather than standardized embeddings.
 )
 
 print(f"[INFO] Using device: {device}")
@@ -54,12 +55,14 @@ def align_video_frames(video_frames_dir: Path, output_dir: Path):
 
             # Convert tensor to PIL image
             face = face.permute(1, 2, 0).cpu().numpy()
-            face_img = Image.fromarray(face.astype("uint8"))
+            # MTCNN(post_process=False) returns pixel intensities in [0, 255].
+            face_rgb = face.clip(0, 255).round().astype("uint8")
+            face_img = Image.fromarray(face_rgb, mode="RGB")
 
             face_img.save(out_path)
 
-        except Exception as e:
-            # Skip corrupted frames silently
+        except (OSError, ValueError, RuntimeError) as exc:
+            print(f"[WARNING] Could not align {frame_path}: {exc}")
             continue
 
 
@@ -81,10 +84,7 @@ def process_dataset(dataset_name: str):
     for video_dir in tqdm(video_dirs, desc=f"Aligning faces ({dataset_name})"):
         out_dir = output_root / video_dir.name
 
-        # ✅ RESUME LOGIC: skip already processed videos
-        if out_dir.exists() and any(out_dir.iterdir()):
-            continue
-
+        # Resume per frame: do not skip a partly processed video.
         align_video_frames(video_dir, out_dir)
 
 

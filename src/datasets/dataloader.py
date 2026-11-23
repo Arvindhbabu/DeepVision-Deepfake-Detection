@@ -24,6 +24,7 @@ def create_dataloaders(config: dict, synthetic_fallback: bool = False):
     """
     image_size = config["dataset"].get("image_size", 224)
     seq_len = config["dataset"].get("sequence_length", 30)
+    imagenet_normalize = bool(config.get("model", {}).get("pretrained", False))
     batch_size = config["dataloader"].get("batch_size", 2)
     num_workers = config["dataloader"].get("num_workers", 0)
     # CPU compatibility: only pin memory if CUDA is actually available
@@ -52,6 +53,7 @@ def create_dataloaders(config: dict, synthetic_fallback: bool = False):
         image_size=image_size,
         synthetic_if_missing=synthetic_fallback,
         sequence_length=seq_len,
+        imagenet_normalize=imagenet_normalize,
     )
 
     val_dataset = SequenceDataset(
@@ -60,6 +62,7 @@ def create_dataloaders(config: dict, synthetic_fallback: bool = False):
         image_size=image_size,
         synthetic_if_missing=synthetic_fallback,
         sequence_length=seq_len,
+        imagenet_normalize=imagenet_normalize,
     )
 
     test_dataset = SequenceDataset(
@@ -68,6 +71,7 @@ def create_dataloaders(config: dict, synthetic_fallback: bool = False):
         image_size=image_size,
         synthetic_if_missing=synthetic_fallback,
         sequence_length=seq_len,
+        imagenet_normalize=imagenet_normalize,
     )
 
     train_sampler = create_balanced_sampler(train_dataset) if len(train_dataset) > 0 else None

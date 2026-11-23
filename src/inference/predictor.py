@@ -6,7 +6,6 @@ Inference Predictor System
 
 from pathlib import Path
 from typing import Tuple, List, Union
-import random
 import cv2
 import numpy as np
 import torch
@@ -34,6 +33,7 @@ class DeepfakePredictor:
         self.config = config
         self.image_size = config["dataset"].get("image_size", 224)
         self.seq_len = config["dataset"].get("sequence_length", 30)
+        self.imagenet_normalize = bool(config.get("model", {}).get("pretrained", False))
 
         self.model = ModelFactory.create(config)
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
@@ -63,38 +63,48 @@ class DeepfakePredictor:
         Returns:
             torch.Tensor: Tensor of shape (num_clips, T, C, H, W)
         """
-        cap = cv2.VideoCapture(str(video_path))
-        frames = []
-
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            frame = cv2.resize(frame, (self.image_size, self.image_size))
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frames.append(frame)
-
-        cap.release()
-
-        if len(frames) == 0:
-            raise ValueError(f"Could not read any frames from video: {video_path}")
-
-        # If video is shorter than sequence length, pad with last frame
-        if len(frames) < self.seq_len:
-            pad_count = self.seq_len - len(frames)
-            frames = frames + [frames[-1]] * pad_count
-
-        clips = []
-        max_start = max(0, len(frames) - self.seq_len)
-
-        for _ in range(num_clips):
-            start = random.randint(0, max_start) if max_start > 0 else 0
-            clip_frames = frames[start:start + self.seq_len]
-            clip_arr = np.stack(clip_frames).astype(np.float32) / 255.0
-            clip_tensor = torch.from_numpy(clip_arr).permute(0, 3, 1, 2)  # (T, C, H, W)
-            clips.append(clip_tensor)
-
-        return torch.stack(clips)  # (num_clips, T, C, H, W)
+        if num_clips < 1 or self.seq_len < 1:
+            raise ValueError("num_clips and sequence_length must be positive")
+        path = Path(video_path)
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        cap = cv2.VideoCapture(str(path))
+        if not cap.isOpened():
+            raise ValueError(f"Cannot open video: {path}")
+        try:
+            count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            if count <= 0:
+                raise ValueError(f"Video has no usable frame count: {path}")
+            # Deterministic positions, decode only sampled frames; bounded by clips * seq_len.
+            max_start = max(0, count - self.seq_len)
+            starts = np.linspace(0, max_start, num_clips, dtype=np.int64)
+            clip_tensors = []
+            for start in starts:
+                frames = []
+                for frame_idx in range(int(start), int(start) + self.seq_len):
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, min(frame_idx, count - 1))
+                    ok, frame = cap.read()
+                    if not ok:
+                        if not frames:
+                            raise ValueError(f"Unable to decode frame {frame_idx}: {path}")
+                        frame = frames[-1]
+                        frames.append(frame)
+                        continue
+                    frame = cv2.cvtColor(
+                        cv2.resize(frame, (self.image_size, self.image_size)),
+                        cv2.COLOR_BGR2RGB,
+                    )
+                    frames.append(frame)
+                arr = np.stack(frames).astype(np.float32) / 255.0
+                clip_tensor = torch.from_numpy(arr).permute(0, 3, 1, 2).contiguous()
+                if self.imagenet_normalize:
+                    mean = clip_tensor.new_tensor((0.485, 0.456, 0.406)).view(1, 3, 1, 1)
+                    std = clip_tensor.new_tensor((0.229, 0.224, 0.225)).view(1, 3, 1, 1)
+                    clip_tensor = (clip_tensor - mean) / std
+                clip_tensors.append(clip_tensor)
+            return torch.stack(clip_tensors)
+        finally:
+            cap.release()
 
     def predict_video(
         self,
@@ -109,12 +119,12 @@ class DeepfakePredictor:
             confidence (float): Percentage score (0-100%)
             clip_probabilities (List[float]): Per-clip fake probability scores
         """
-        clips = self.extract_clips_from_video(video_path, num_clips=num_clips).to(self.device)
+        clips = self.extract_clips_from_video(video_path, num_clips=num_clips)
 
         clip_probs = []
         with torch.no_grad():
             for clip in clips:
-                clip_batch = clip.unsqueeze(0)  # (1, T, C, H, W)
+                clip_batch = clip.unsqueeze(0).to(self.device)  # (1, T, C, H, W)
                 logits = self.model(clip_batch)
                 prob = torch.softmax(logits, dim=1)[0, 1]  # Fake class prob
                 clip_probs.append(prob.item())

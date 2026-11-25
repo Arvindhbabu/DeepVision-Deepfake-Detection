@@ -1,4 +1,6 @@
 """Pure CPU tests for validation comparisons; no user data required."""
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +13,15 @@ from scripts.train_cached_bilstm import CachedBiLSTM
 
 
 class TestValidationComparison(unittest.TestCase):
+    def test_direct_script_entrypoint(self):
+        script = Path(__file__).resolve().parents[1] / "scripts" / "compare_cached_models.py"
+        result = subprocess.run(
+            [sys.executable, str(script), "--help"],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--cache-root", result.stdout)
+
     def test_confusion_matrix_and_scores(self):
         labels = np.asarray([0, 0, 1, 1], dtype=np.int64)
         scores = np.asarray([0.1, 0.7, 0.9, 0.8])

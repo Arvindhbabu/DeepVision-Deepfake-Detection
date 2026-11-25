@@ -1,26 +1,16 @@
-# DeepVision AI — Single Video Inference Specification
+# DeepVision AI — CPU Inference
 
-## 1. Overview
+Use `python predict.py --input video.mp4 --checkpoint PATH --config CONFIG --clips 3`.
 
-The inference system (`predict.py`, `src/inference/predictor.py`) processes input video files by extracting multiple temporal frame clips, evaluating per-clip deepfake probabilities, and computing an aggregated final prediction.
+The current predictor samples clips at deterministic temporal positions and decodes
+only the requested frames, avoiding full-video buffering. The video container must
+report a valid frame count, and OpenCV must be able to seek/decode those frames.
 
----
+Model input is RGB resized to the configured size. If `model.pretrained: true`,
+ImageNet channel normalization is applied after scaling to [0, 1].
+A checkpoint must match the model architecture and preprocessing configuration
+used for its training.
 
-## 2. Command Execution
-
-```bash
-python predict.py \
-    --input sample_video.mp4 \
-    --checkpoint outputs/runs/run_20260913_120000/best_model.pth \
-    --config configs/default.yaml \
-    --clips 5
-```
-
----
-
-## 3. Inference Logic
-
-1. **Video Decoding**: Reads input video using OpenCV and resizes frames to target `image_size` (e.g. 224x224).
-2. **Multi-Clip Sampling**: Samples `num_clips` random temporal sequence clips across video duration.
-3. **Model Inference**: Passes sequence clips through `DeepfakePredictor` and computes softmax probabilities for the **DEEPFAKE** class.
-4. **Ensemble Aggregation**: Computes average probability across clips and assigns final binary label (`REAL` vs `DEEPFAKE`) with confidence percentage score.
+The score is a softmax model output, **not calibrated forensic certainty**.
+Real/fake predictions from untrained or synthetic-smoke-test checkpoints have
+no real-world meaning. Long videos may still incur significant seeking costs.

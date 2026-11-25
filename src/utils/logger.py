@@ -27,7 +27,10 @@ def create_logger(
 
     logger.setLevel(logging.INFO)
 
-    logger.handlers.clear()
+    # Detach and close existing handlers to release file descriptors.
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+        handler.close()
 
     formatter = logging.Formatter(
         "%(asctime)s | %(levelname)s | %(message)s"

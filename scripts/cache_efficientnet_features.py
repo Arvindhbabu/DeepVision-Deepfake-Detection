@@ -79,6 +79,8 @@ def cache_split(split_csv: Path, sequence_root: Path, destination: Path,
 
     index_rows = []
     limit = len(ds) if max_samples is None else min(len(ds), max_samples)
+    if prior and limit < len(prior):
+        raise ValueError("Requested max-samples is smaller than the existing cache index")
     for idx in range(limit):
         row = ds.data.iloc[idx]
         target = destination / f"{idx:05d}.npy"

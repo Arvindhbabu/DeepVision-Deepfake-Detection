@@ -110,6 +110,8 @@ def mp4_to_sequence(path: Path, *, sample_fps: float = 5.0,
     return np.stack([aligned[i] for i in indices]), {
         "decoded_frames": total,
         "fps": fps,
+        "target_sampling_fps": sample_fps,
+        "face_size": face_size,
         "sampled_frames": sampled,
         "aligned_faces": len(aligned),
         "max_sampled_frames": max_sampled_frames,
@@ -154,6 +156,8 @@ def main():
         "outputs/experiments/cached_bilstm_full_v1/best_bilstm.pt"))
     parser.add_argument("--frame-batch-size", type=int, default=1)
     parser.add_argument("--max-sampled-frames", type=int, default=300)
+    parser.add_argument("--face-size", type=int, choices=(224, 260), default=224,
+                        help="Experimental MP4 MTCNN crop size; 260 matches verified FF++ sequence dimensions")
     args = parser.parse_args()
     if not args.checkpoint.is_file():
         raise FileNotFoundError(args.checkpoint)
@@ -163,7 +167,8 @@ def main():
         provenance = {"input_type": "prealigned_npy", "preprocessing_parity": "training_format"}
     elif path.suffix.lower() in {".mp4", ".mov", ".avi", ".mkv"}:
         sequence, provenance = mp4_to_sequence(
-            path, max_sampled_frames=args.max_sampled_frames
+            path, max_sampled_frames=args.max_sampled_frames,
+            face_size=args.face_size,
         )
         provenance["input_type"] = "raw_video_experimental"
     else:

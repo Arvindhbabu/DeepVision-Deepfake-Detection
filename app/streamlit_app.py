@@ -97,12 +97,17 @@ def main() -> None:
         st.error(f"Unable to analyze video: {exc}")
         return
     label = result["label"]
-    st.subheader(f"Model prediction: {label}")
+    st.subheader(f"Experimental model output: {label}")
     st.metric("Fake class softmax score", f"{result['fake_score'] * 100:.1f}%")
     st.progress(float(result["fake_score"]))
+    st.error(
+        "UNVERIFIED for personal or out-of-domain videos. The model has "
+        "previously mislabeled authentic recordings as Fake. This classification "
+        "is not evidence that the uploaded video has been manipulated."
+    )
     st.warning(
-        "This number is a model score, not the probability the video is fake. "
-        "A Real/Fake prediction alone cannot establish authenticity."
+        "The displayed softmax score is not a calibrated probability; "
+        "a Real/Fake prediction alone cannot establish authenticity."
     )
     st.subheader("Processing details")
     st.json(result["preprocessing"])
